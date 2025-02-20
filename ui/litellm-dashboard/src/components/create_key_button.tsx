@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useRef } from "react";
 import { Button, TextInput, Grid, Col } from "@tremor/react";
 import {
@@ -24,13 +23,16 @@ import {
   Radio,
 } from "antd";
 import { unfurlWildcardModelsInList, getModelDisplayName } from "./key_team_helpers/fetch_available_models_team_key";
+import SchemaFormFields from './common_components/check_openapi_schema';
 import {
   keyCreateCall,
   slackBudgetAlertsHealthCheck,
   modelAvailableCall,
   getGuardrailsList,
+  proxyBaseUrl,
 } from "./networking";
 import { Team } from "./key_team_helpers/key_list";
+import TeamDropdown from "./common_components/team_dropdown";
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { Tooltip } from 'antd';
 
@@ -292,28 +294,13 @@ const CreateKey: React.FC<CreateKeyProps> = ({
               initialValue={team ? team.team_id : null}
               className="mt-8"
             >
-              <Select
-                showSearch
-                placeholder="Search or select a team"
-                onChange={(value) => {
-                  form.setFieldValue('team_id', value);
-                  const selectedTeam = teams?.find(team => team.team_id === value);
-                  setSelectedCreateKeyTeam(selectedTeam || null);
+              <TeamDropdown 
+                teams={teams} 
+                onChange={(teamId) => {
+                  const selectedTeam = teams?.find(t => t.team_id === teamId) || null;
+                  setSelectedCreateKeyTeam(selectedTeam);
                 }}
-                filterOption={(input, option) => {
-                  if (!option) return false;
-                  const optionValue = option.children?.toString() || '';
-                  return optionValue.toLowerCase().includes(input.toLowerCase());
-                }}
-                optionFilterProp="children"
-              >
-                {teams?.map((team) => (
-                  <Select.Option key={team.team_id} value={team.team_id}>
-                    <span className="font-medium">{team.team_alias}</span>{" "}
-                    <span className="text-gray-500">({team.team_id})</span>
-                  </Select.Option>
-                ))}
-              </Select>
+              />
             </Form.Item>
 
             <Form.Item
@@ -488,6 +475,36 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                     options={predefinedTags}
                   />
                 </Form.Item>
+                <Accordion className="mt-20 mb-8">
+                  <AccordionHeader>
+                  <div className="flex items-center gap-2">
+
+                    <b>Advanced Settings</b>
+                    <Tooltip title={ 
+                      <span>
+                        Learn more about advanced settings in our{' '}
+                        <a 
+                          href={proxyBaseUrl ? `${proxyBaseUrl}/#/key%20management/generate_key_fn_key_generate_post`: `/#/key%20management/generate_key_fn_key_generate_post`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300"
+                        >
+                          documentation
+                        </a>
+                      </span>
+                    }>
+                      <InfoCircleOutlined className="text-gray-400 hover:text-gray-300 cursor-help" />
+                    </Tooltip>
+                    </div>
+                  </AccordionHeader>
+                  <AccordionBody>
+                    <SchemaFormFields 
+                      schemaComponent="GenerateKeyRequest"
+                      form={form}
+                      excludedFields={['key_alias', 'team_id', 'models', 'duration', 'metadata', 'tags', 'guardrails', "max_budget", "budget_duration", "tpm_limit", "rpm_limit"]}
+                    />
+                  </AccordionBody>
+                </Accordion>
               </AccordionBody>
             </Accordion>
           </>
