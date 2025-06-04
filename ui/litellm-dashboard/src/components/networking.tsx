@@ -2944,11 +2944,15 @@ export const userGetAllUsersCall = async (
   accessToken: String,
   role: String
 ) => {
+  console.log("=== USER GET ALL USERS CALL START ===");
+  console.log("Access token present:", !!accessToken);
+  console.log("Role filter:", role);
+  
   try {
-    const url = proxyBaseUrl
-      ? `${proxyBaseUrl}/user/get_users?role=${role}`
-      : `/user/get_users?role=${role}`;
-    console.log("in userGetAllUsersCall:", url);
+    const proxyBaseUrl = getProxyBaseUrl();
+    const url = `${proxyBaseUrl}/user/list?role=${role}`;
+    console.log("API URL:", url);
+    
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -2957,18 +2961,26 @@ export const userGetAllUsersCall = async (
       },
     });
 
+    console.log("Response status:", response.status);
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorData = await response.text();
+      console.error("API Error Response Text:", errorData);
       handleError(errorData);
       throw new Error("Network response was not ok");
     }
+    
     const data = await response.json();
-    console.log(data);
-    //message.success("Got all users");
+    console.log("API Response Data:", JSON.stringify(data, null, 2));
+    console.log("=== USER GET ALL USERS CALL END ===");
+    
     return data;
     // Handle success - you might want to update some state or UI based on the created key
   } catch (error) {
-    console.error("Failed to get requested models:", error);
+    console.error("Failed to get users:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
+    console.log("=== USER GET ALL USERS CALL END (ERROR) ===");
     throw error;
   }
 };
@@ -5353,6 +5365,125 @@ export const updateGuardrailCall = async (
     return data;
   } catch (error) {
     console.error("Failed to update guardrail:", error);
+    throw error;
+  }
+};
+
+export const getSSOProviderConfig = async (token: string) => {
+  console.log("=== GET SSO PROVIDER CONFIG API CALL START ===");
+  console.log("Access token present:", !!token);
+  
+  try {
+    const proxyBaseUrl = getProxyBaseUrl();
+    const url = `${proxyBaseUrl}/get/sso_provider_config`;
+    console.log("API URL:", url);
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Response status:", response.status);
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response Text:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("API Response Data:", JSON.stringify(data, null, 2));
+    console.log("=== GET SSO PROVIDER CONFIG API CALL END ===");
+    return data;
+  } catch (error) {
+    console.error("Error in getSSOProviderConfig:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
+    console.log("=== GET SSO PROVIDER CONFIG API CALL END (ERROR) ===");
+    throw error;
+  }
+};
+
+export const updateSSOProviderConfig = async (token: string, config: any) => {
+  console.log("=== UPDATE SSO PROVIDER CONFIG API CALL START ===");
+  console.log("Access token present:", !!token);
+  console.log("Config to send:", JSON.stringify(config, null, 2));
+  
+  try {
+    const proxyBaseUrl = getProxyBaseUrl();
+    const url = `${proxyBaseUrl}/update/sso_provider_config`;
+    console.log("API URL:", url);
+
+    const requestBody = JSON.stringify(config);
+    console.log("Request body:", requestBody);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: requestBody,
+    });
+
+    console.log("Response status:", response.status);
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response Text:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("API Response Data:", JSON.stringify(data, null, 2));
+    console.log("=== UPDATE SSO PROVIDER CONFIG API CALL END ===");
+    return data;
+  } catch (error) {
+    console.error("Error in updateSSOProviderConfig:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
+    console.log("=== UPDATE SSO PROVIDER CONFIG API CALL END (ERROR) ===");
+    throw error;
+  }
+};
+
+export const deleteSSOProviderConfig = async (token: string) => {
+  console.log("=== DELETE SSO PROVIDER CONFIG API CALL START ===");
+  console.log("Access token present:", !!token);
+  
+  try {
+    const proxyBaseUrl = getProxyBaseUrl();
+    const url = `${proxyBaseUrl}/delete/sso_provider_config`;
+    console.log("API URL:", url);
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Response status:", response.status);
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response Text:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("API Response Data:", JSON.stringify(data, null, 2));
+    console.log("=== DELETE SSO PROVIDER CONFIG API CALL END ===");
+    return data;
+  } catch (error) {
+    console.error("Error in deleteSSOProviderConfig:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
+    console.log("=== DELETE SSO PROVIDER CONFIG API CALL END (ERROR) ===");
     throw error;
   }
 };

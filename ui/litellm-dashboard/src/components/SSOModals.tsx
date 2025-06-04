@@ -10,6 +10,8 @@ interface SSOModalsProps {
   handleShowInstructions: (formValues: Record<string, any>) => void;
   handleInstructionsOk: () => void;
   handleInstructionsCancel: () => void;
+  handleDeleteSSO?: () => void;
+  isConfigured?: boolean;
   form: any; // Replace with proper Form type if available
 }
 
@@ -96,33 +98,81 @@ const SSOModals: React.FC<SSOModalsProps> = ({
   handleShowInstructions,
   handleInstructionsOk,
   handleInstructionsCancel,
+  handleDeleteSSO,
+  isConfigured,
   form,
 }) => {
+
+  // Debug form values when modal visibility changes
+  React.useEffect(() => {
+    if (isAddSSOModalVisible) {
+      console.log("SSO Modal opened, isConfigured:", isConfigured);
+      console.log("Current form values:", form.getFieldsValue());
+    }
+  }, [isAddSSOModalVisible, isConfigured, form]);
+
   // Helper function to render provider fields
   const renderProviderFields = (provider: string) => {
     const config = ssoProviderConfigs[provider];
     if (!config) return null;
 
-    return config.fields.map((field) => (
-      <Form.Item
-        key={field.name}
-        label={field.label}
-        name={field.name}
-        rules={[{ required: true, message: `Please enter the ${field.label.toLowerCase()}` }]}
-      >
-        {field.name.includes('client') ? (
-          <Input.Password />
-        ) : (
-          <TextInput placeholder={field.placeholder} />
-        )}
-      </Form.Item>
-    ));
+    return config.fields.map((field) => {
+      const isSecretField = field.name.includes('_secret');
+      const fieldValue = form.getFieldValue(field.name);
+      const isExistingSecret = isSecretField && fieldValue === '***';
+      
+      console.log(`Field ${field.name}: value="${fieldValue}", isExistingSecret=${isExistingSecret}`);
+      
+      const placeholder = isExistingSecret 
+        ? "••••••••• (configured - leave empty to keep existing)" 
+        : (isConfigured && isSecretField) 
+          ? "Enter new value to update" 
+          : field.placeholder || "Enter value";
+      
+      const isFieldRequired = !isConfigured && !isExistingSecret; // Only require if not already configured
+      
+      return (
+        <Form.Item
+          key={field.name}
+          label={field.label}
+          name={field.name}
+          rules={[{ 
+            required: isFieldRequired,
+            message: `Please enter the ${field.label.toLowerCase()}` 
+          }]}
+          extra={isExistingSecret ? "✓ Value is already configured. Leave empty to keep existing value." : undefined}
+        >
+          {isSecretField ? (
+            <Input.Password 
+              placeholder={placeholder}
+              // Don't set value prop for existing secrets to allow normal input behavior
+              autoComplete="new-password" // Prevent browser autofill interference
+              style={isExistingSecret ? { 
+                backgroundColor: '#f6ffed',
+                borderColor: '#52c41a' 
+              } : undefined}
+              onBlur={(e) => {
+                // If the field was cleared but had an existing value, restore the masked indicator
+                if (isExistingSecret && e.target.value === '') {
+                  form.setFieldValue(field.name, '***');
+                }
+              }}
+            />
+          ) : (
+            <Input 
+              placeholder={placeholder}
+              autoComplete={isSecretField ? "new-password" : "off"} // Prevent browser autofill
+            />
+          )}
+        </Form.Item>
+      );
+    });
   };
 
   return (
     <>
       <Modal
-        title="Add SSO"
+        title={isConfigured ? "Update SSO Configuration" : "Add SSO"}
         visible={isAddSSOModalVisible}
         width={800}
         footer={null}
@@ -180,7 +230,18 @@ const SSOModals: React.FC<SSOModalsProps> = ({
             </Form.Item>
           </>
           <div style={{ textAlign: "right", marginTop: "10px" }}>
-            <Button2 htmlType="submit">Save</Button2>
+            {isConfigured && handleDeleteSSO && (
+              <Button2 
+                danger 
+                onClick={handleDeleteSSO} 
+                style={{ marginRight: "10px" }}
+              >
+                Delete SSO Config
+              </Button2>
+            )}
+            <Button2 htmlType="submit">
+              {isConfigured ? "Update" : "Save"}
+            </Button2>
           </div>
         </Form>
       </Modal>
