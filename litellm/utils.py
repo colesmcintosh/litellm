@@ -4224,6 +4224,36 @@ def _strip_openai_finetune_model_name(model_name: str) -> str:
     return re.sub(r"(:[^:]+){3}$", "", model_name)
 
 
+def _is_valid_google_cloud_region(region: str) -> bool:
+    """
+    Check if a string is a valid Google Cloud region name.
+    
+    Args:
+        region: The potential region string to validate
+        
+    Returns:
+        bool: True if it's a valid Google Cloud region, False otherwise
+    """
+    valid_region_prefixes = [
+        "us-central", "us-east", "us-west", "us-south",
+        "europe-west", "europe-north", "europe-central", "europe-southwest",
+        "asia-east", "asia-northeast", "asia-southeast", "asia-south",
+        "australia-southeast",
+        "southamerica-east", "southamerica-west",
+        "northamerica-northeast"
+    ]
+    
+    # Check if the potential region starts with any valid prefix and optionally ends with a number
+    for prefix in valid_region_prefixes:
+        if region.startswith(prefix):
+            # Check if it's exactly the prefix or prefix + number
+            remainder = region[len(prefix):]
+            if remainder == "" or remainder.isdigit():
+                return True
+    
+    return False
+
+
 def _strip_model_name(model: str, custom_llm_provider: Optional[str]) -> str:
     if custom_llm_provider and custom_llm_provider == "bedrock":
         stripped_bedrock_model = _get_base_bedrock_model(model_name=model)
@@ -4231,6 +4261,15 @@ def _strip_model_name(model: str, custom_llm_provider: Optional[str]) -> str:
     elif custom_llm_provider and (
         custom_llm_provider == "vertex_ai" or custom_llm_provider == "gemini"
     ):
+        # Handle regional Vertex AI models
+        # Pattern: model_name could be like "us-central1/gemini-1.5-pro" or just "gemini-1.5-pro"
+        # We want to strip the region part and return just the base model name
+        if "/" in model:
+            parts = model.split("/")
+            if len(parts) >= 2 and _is_valid_google_cloud_region(parts[0]):
+                # Skip the region part and join the rest
+                model = "/".join(parts[1:])
+        
         strip_version = _strip_stable_vertex_version(model_name=model)
         return strip_version
     elif custom_llm_provider and (custom_llm_provider == "databricks"):

@@ -16,9 +16,11 @@ import litellm
 from litellm.cost_calculator import (
     handle_realtime_stream_cost_calculation,
     response_cost_calculator,
+    completion_cost,
 )
 from litellm.types.llms.openai import OpenAIRealtimeStreamList
 from litellm.types.utils import ModelResponse, PromptTokensDetailsWrapper, Usage
+from litellm.utils import _is_valid_google_cloud_region, _strip_model_name
 
 
 def test_cost_calculator_with_response_cost_in_additional_headers():
@@ -266,3 +268,77 @@ def test_default_image_cost_calculator(monkeypatch):
     }
     cost = default_image_cost_calculator(**args)
     assert cost == 10485760
+
+
+def test_vertex_ai_regional_model_cost_tracking():
+    """Test that Vertex AI regional models properly fall back to base model costs."""
+    
+    # Test 1: Verify the helper function correctly identifies Google Cloud regions
+    valid_regions = ["us-central1", "europe-west1", "asia-southeast1", "australia-southeast1"]
+    invalid_regions = ["invalid-region", "us-fake1", "123-invalid", ""]
+    
+    for region in valid_regions:
+        assert _is_valid_google_cloud_region(region), f"Should be valid: {region}"
+    
+    for region in invalid_regions:
+        assert not _is_valid_google_cloud_region(region), f"Should be invalid: {region}"
+    
+    # Test 2: Verify model name stripping works for regional models
+    regional_test_cases = [
+        ("us-central1/gemini-1.5-pro", "vertex_ai", "gemini-1.5-pro"),
+        ("europe-west1/claude-3-sonnet", "vertex_ai", "claude-3-sonnet"),
+        ("asia-southeast1/text-bison-001", "vertex_ai", "text-bison"),  # Version also stripped
+        ("invalid-region/model", "vertex_ai", "invalid-region/model"),  # Invalid region not stripped
+        ("gemini-1.5-pro", "vertex_ai", "gemini-1.5-pro"),  # Non-regional works as before
+    ]
+    
+    for model, provider, expected in regional_test_cases:
+        result = _strip_model_name(model, provider)
+        assert result == expected, f"Failed for {model}: got {result}, expected {expected}"
+    
+    # Test 3: Verify cost calculation works with mock model costs
+    # Setup mock model costs
+    mock_model_cost = {
+        "gemini-1.5-pro": {
+            "input_cost_per_token": 0.000125,
+            "output_cost_per_token": 0.000375,
+            "litellm_provider": "vertex_ai",
+        },
+        "claude-3-sonnet": {
+            "input_cost_per_token": 0.003,
+            "output_cost_per_token": 0.015,
+            "litellm_provider": "vertex_ai", 
+        }
+    }
+    
+    # Mock the model cost lookup
+    original_model_cost = litellm.model_cost
+    litellm.model_cost = mock_model_cost
+    
+    try:
+        # Create mock usage for test
+        test_messages = [{"role": "user", "content": "Hello"}]
+        
+        # Test that regional model falls back to base model cost
+        regional_cost = completion_cost(
+            model="vertex_ai/us-central1/gemini-1.5-pro",
+            messages=test_messages,
+            custom_llm_provider="vertex_ai"
+        )
+        
+        # Test that base model works directly  
+        base_cost = completion_cost(
+            model="vertex_ai/gemini-1.5-pro", 
+            messages=test_messages,
+            custom_llm_provider="vertex_ai"
+        )
+        
+        # Regional model should have the same cost as base model
+        assert regional_cost == base_cost, f"Regional cost {regional_cost} should equal base cost {base_cost}"
+        
+        # Verify the cost is greater than 0 (i.e., calculation worked)
+        assert regional_cost > 0, f"Cost should be greater than 0, got {regional_cost}"
+        
+    finally:
+        # Restore original model cost
+        litellm.model_cost = original_model_cost

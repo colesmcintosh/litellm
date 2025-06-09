@@ -87,6 +87,7 @@ from litellm.utils import (
     TextCompletionResponse,
     TranscriptionResponse,
     _cached_get_model_info_helper,
+    _is_valid_google_cloud_region,
     token_counter,
 )
 
@@ -650,6 +651,24 @@ def completion_cost(  # noqa: PLR0915
         potential_model_names = [selected_model]
         if model is not None:
             potential_model_names.append(model)
+            
+        # Add additional fallback options for Vertex AI regional models
+        # If the model contains a regional prefix (e.g., vertex_ai/us-central1/gemini-1.5-pro)
+        # Add fallback options without the region for cost lookup
+        if (custom_llm_provider == "vertex_ai" and model is not None and 
+            "/" in model and model.startswith("vertex_ai/")):
+            # Remove the "vertex_ai/" prefix and split the remainder
+            model_without_provider = model[len("vertex_ai/"):]
+            parts = model_without_provider.split("/")
+            
+            if len(parts) >= 2 and _is_valid_google_cloud_region(parts[0]):
+                # Extract the base model name (everything after the region)
+                base_model_name = "/".join(parts[1:])
+                # Add vertex_ai/base_model (without region)
+                potential_model_names.append(f"vertex_ai/{base_model_name}")
+                # Add just the base model name
+                potential_model_names.append(base_model_name)
+        
         for idx, model in enumerate(potential_model_names):
             try:
                 verbose_logger.info(
