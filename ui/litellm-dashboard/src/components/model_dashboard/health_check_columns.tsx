@@ -40,13 +40,21 @@ export const healthCheckColumns = (
   showErrorModal?: (modelName: string, cleanedError: string, fullError: string) => void,
 ): ColumnDef<HealthCheckData>[] => [
   {
-    header: "Model Name",
-    accessorKey: "model_name",
+    header: () => (
+      <div className="flex items-center gap-2">
+        <Checkbox
+          checked={allModelsSelected}
+          indeterminate={selectedModelsForHealth.length > 0 && !allModelsSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+        />
+        <span>Model ID</span>
+      </div>
+    ),
+    accessorKey: "model_info.id",
     enableSorting: true,
     sortingFn: "alphanumeric",
     cell: ({ row }) => {
       const model = row.original;
-      const displayName = getDisplayModelName(model) || model.model_name;
       const modelName = model.model_name;
       const isSelected = selectedModelsForHealth.includes(modelName);
       
@@ -56,13 +64,33 @@ export const healthCheckColumns = (
             checked={isSelected}
             onChange={(e) => handleModelSelection(modelName, e.target.checked)}
           />
-          <div className="font-medium text-sm">
-            <Tooltip title={displayName}>
-              <div className="truncate max-w-[200px]">
-                {displayName}
-              </div>
-            </Tooltip>
-          </div>
+          <Tooltip title={model.model_info.id}>
+            <div 
+              className="font-mono text-blue-500 bg-blue-50 hover:bg-blue-100 text-xs font-normal px-2 py-0.5 text-left w-full truncate whitespace-nowrap cursor-pointer max-w-[15ch]"
+            >
+              {model.model_info.id}
+            </div>
+          </Tooltip>
+        </div>
+      );
+    },
+  },
+  {
+    header: "Model Name",
+    accessorKey: "model_name",
+    enableSorting: true,
+    sortingFn: "alphanumeric",
+    cell: ({ row }) => {
+      const model = row.original;
+      const displayName = getDisplayModelName(model) || model.model_name;
+      
+      return (
+        <div className="font-medium text-sm">
+          <Tooltip title={displayName}>
+            <div className="truncate max-w-[200px]">
+              {displayName}
+            </div>
+          </Tooltip>
         </div>
       );
     },

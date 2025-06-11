@@ -1696,16 +1696,16 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
                       </Text>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Button
-                        size="sm"
-                        variant="light"
-                        onClick={() => handleSelectAll(selectedModelsForHealth.length === 0)}
-                        className="px-3 py-1 text-sm"
-                      >
-                        {selectedModelsForHealth.length > 0 
-                          ? `Clear Selection (${selectedModelsForHealth.length})` 
-                          : 'Select All'}
-                      </Button>
+                      {selectedModelsForHealth.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="light"
+                          onClick={() => handleSelectAll(false)}
+                          className="px-3 py-1 text-sm"
+                        >
+                          Clear Selection
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="secondary"
