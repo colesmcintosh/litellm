@@ -203,7 +203,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
   const [selectedProvider, setSelectedProvider] = useState<Providers>(Providers.OpenAI);
   const [healthCheckResponse, setHealthCheckResponse] = useState<any>(null);
   const [isHealthCheckLoading, setIsHealthCheckLoading] = useState<boolean>(false);
-  const [modelHealthStatuses, setModelHealthStatuses] = useState<{[key: string]: {status: string, lastCheck: string, loading: boolean, error?: string, fullError?: string}}>({});
+  const [modelHealthStatuses, setModelHealthStatuses] = useState<{[key: string]: {status: string, lastCheck: string, loading: boolean, error?: string}}>({});
   const [selectedModelsForHealth, setSelectedModelsForHealth] = useState<string[]>([]);
   const [allModelsSelected, setAllModelsSelected] = useState<boolean>(false);
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
@@ -268,14 +268,6 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<TableInstance<any>>(null);
   const healthTableRef = useRef<TableInstance<any>>(null);
-
-  // State for error modal
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [selectedErrorDetails, setSelectedErrorDetails] = useState<{
-    modelName: string;
-    cleanedError: string;
-    fullError: string;
-  } | null>(null);
 
   const setProviderModelsFn = (provider: Providers) => {
     const _providerModels = getProviderModels(provider, modelMap);
@@ -544,17 +536,15 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
           console.log("Latest health checks:", latestHealthChecks);
           
           // Convert to the format expected by the UI
-          const healthStatusMap: {[key: string]: {status: string, lastCheck: string, loading: boolean, error?: string, fullError?: string}} = {};
+          const healthStatusMap: {[key: string]: {status: string, lastCheck: string, loading: boolean, error?: string}} = {};
           
           if (latestHealthChecks.latest_health_checks) {
             Object.entries(latestHealthChecks.latest_health_checks).forEach(([modelName, checkData]: [string, any]) => {
-              const fullError = checkData.error_message || undefined;
               healthStatusMap[modelName] = {
                 status: checkData.status,
                 lastCheck: checkData.checked_at ? new Date(checkData.checked_at).toLocaleString() : 'Never checked',
                 loading: false,
-                error: fullError ? extractMeaningfulError(fullError) : undefined,
-                fullError: fullError,
+                error: checkData.error_message || undefined,
               };
             });
           }
@@ -915,8 +905,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
             status: 'unhealthy',
             lastCheck: currentTime,
             loading: false,
-            error: errorMessage,
-            fullError: rawError
+            error: errorMessage
           }
         }));
       }
@@ -942,16 +931,14 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
       
     } catch (error) {
       const currentTime = new Date().toLocaleString();
-      const rawError = error instanceof Error ? error.message : String(error);
-      const errorMessage = extractMeaningfulError(rawError);
+      const errorMessage = extractMeaningfulError(error instanceof Error ? error.message : error);
       setModelHealthStatuses(prev => ({
         ...prev,
         [modelName]: {
           status: 'unhealthy',
           lastCheck: currentTime,
           loading: false,
-          error: errorMessage,
-          fullError: rawError
+          error: errorMessage
         }
       }));
     }
@@ -1004,8 +991,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
               status: 'unhealthy',
               lastCheck: currentTime,
               loading: false,
-              error: errorMessage,
-              fullError: rawError
+              error: errorMessage
             }
           }));
         }
@@ -1013,16 +999,14 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
         console.error(`Health check failed for ${modelName}:`, error);
         // Set error status for failed health checks
         const currentTime = new Date().toLocaleString();
-        const rawError = error instanceof Error ? error.message : String(error);
-        const errorMessage = extractMeaningfulError(rawError);
+        const errorMessage = extractMeaningfulError(error instanceof Error ? error.message : error);
         setModelHealthStatuses(prev => ({
           ...prev,
           [modelName]: {
             status: 'unhealthy',
             lastCheck: currentTime,
             loading: false,
-            error: errorMessage,
-            fullError: rawError
+            error: errorMessage
           }
         }));
       }
@@ -1090,20 +1074,6 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
       default:
         return <Badge color="gray">unknown</Badge>;
     }
-  };
-
-  const showErrorModal = (modelName: string, cleanedError: string, fullError: string) => {
-    setSelectedErrorDetails({
-      modelName,
-      cleanedError,
-      fullError
-    });
-    setErrorModalVisible(true);
-  };
-
-  const closeErrorModal = () => {
-    setErrorModalVisible(false);
-    setSelectedErrorDetails(null);
   };
 
   const FilterByContent = (
@@ -1588,33 +1558,31 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
                 </div>
 
                 <div className="p-6">
-                                      <ModelDataTable
-                      columns={healthCheckColumns(
-                        modelHealthStatuses,
-                        selectedModelsForHealth,
-                        allModelsSelected,
-                        handleModelSelection,
-                        handleSelectAll,
-                        runIndividualHealthCheck,
-                        getStatusBadge,
-                        getDisplayModelName,
-                        showErrorModal,
-                      )}
-                                          data={modelData.data.map((model: any) => {
-                        const modelName = model.model_name;
-                        const healthStatus = modelHealthStatuses[modelName] || { status: 'unknown', lastCheck: 'Never checked', loading: false };
-                        return {
-                          model_name: model.model_name,
-                          model_info: model.model_info,
-                          provider: model.provider,
-                          litellm_model_name: model.litellm_model_name,
-                          health_status: healthStatus.status,
-                          last_check: healthStatus.lastCheck,
-                          health_loading: healthStatus.loading,
-                          health_error: healthStatus.error,
-                          health_full_error: healthStatus.fullError,
-                        };
-                      })}
+                  <ModelDataTable
+                    columns={healthCheckColumns(
+                      modelHealthStatuses,
+                      selectedModelsForHealth,
+                      allModelsSelected,
+                      handleModelSelection,
+                      handleSelectAll,
+                      runIndividualHealthCheck,
+                      getStatusBadge,
+                      getDisplayModelName,
+                    )}
+                    data={modelData.data.map((model: any) => {
+                      const modelName = model.model_name;
+                      const healthStatus = modelHealthStatuses[modelName] || { status: 'unknown', lastCheck: 'Never checked', loading: false };
+                      return {
+                        model_name: model.model_name,
+                        model_info: model.model_info,
+                        provider: model.provider,
+                        litellm_model_name: model.litellm_model_name,
+                        health_status: healthStatus.status,
+                        last_check: healthStatus.lastCheck,
+                        health_loading: healthStatus.loading,
+                        health_error: healthStatus.error,
+                      };
+                    })}
                     isLoading={false}
                     table={healthTableRef}
                   />
@@ -1967,39 +1935,6 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
           </TabPanels>
         </TabGroup>
       )}
-      
-      {/* Error Modal */}
-      <Modal
-        title={selectedErrorDetails ? `Health Check Error - ${selectedErrorDetails.modelName}` : 'Error Details'}
-        open={errorModalVisible}
-        onCancel={closeErrorModal}
-        footer={[
-          <Button2 key="close" onClick={closeErrorModal}>
-            Close
-          </Button2>
-        ]}
-        width={800}
-      >
-        {selectedErrorDetails && (
-          <div className="space-y-4">
-            <div>
-              <Text className="font-medium">Cleaned Error:</Text>
-              <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
-                <Text className="text-red-800">{selectedErrorDetails.cleanedError}</Text>
-              </div>
-            </div>
-            
-            <div>
-              <Text className="font-medium">Full Error Details:</Text>
-              <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md max-h-96 overflow-y-auto">
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap">
-                  {selectedErrorDetails.fullError}
-                </pre>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>  
   );
 };

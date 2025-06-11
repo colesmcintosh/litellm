@@ -2,7 +2,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button, Badge } from "@tremor/react";
 import { Tooltip, Checkbox } from "antd";
 import { Text } from "@tremor/react";
-import { InformationCircleIcon } from "@heroicons/react/outline";
 
 interface HealthCheckData {
   model_name: string;
@@ -17,7 +16,6 @@ interface HealthCheckData {
   last_check: string;
   health_loading: boolean;
   health_error?: string;
-  health_full_error?: string;
 }
 
 interface HealthStatus {
@@ -25,7 +23,6 @@ interface HealthStatus {
   lastCheck: string;
   loading: boolean;
   error?: string;
-  fullError?: string;
 }
 
 export const healthCheckColumns = (
@@ -37,7 +34,6 @@ export const healthCheckColumns = (
   runIndividualHealthCheck: (modelName: string) => void,
   getStatusBadge: (status: string) => JSX.Element,
   getDisplayModelName: (model: any) => string,
-  showErrorModal?: (modelName: string, cleanedError: string, fullError: string) => void,
 ): ColumnDef<HealthCheckData>[] => [
   {
     header: "Model Name",
@@ -105,45 +101,14 @@ export const healthCheckColumns = (
 
       return (
         <div className="flex items-center space-x-2">
-          {getStatusBadge(healthStatus.status)}
-        </div>
-      );
-    },
-  },
-  {
-    header: "Error Details",
-    accessorKey: "health_error",
-    enableSorting: false,
-    cell: ({ row }) => {
-      const model = row.original;
-      const modelName = model.model_name;
-      const healthStatus = modelHealthStatuses[modelName];
-      
-      if (!healthStatus?.error) {
-        return <Text className="text-gray-400 text-sm">No errors</Text>;
-      }
-
-      const cleanedError = healthStatus.error;
-      const fullError = healthStatus.fullError || healthStatus.error;
-
-      return (
-        <div className="flex items-center space-x-2">
-          <div className="max-w-[200px]">
-            <Tooltip title={cleanedError} placement="top">
-              <Text className="text-red-600 text-sm truncate">
-                {cleanedError}
-              </Text>
+          {healthStatus.error ? (
+            <Tooltip title={healthStatus.error} placement="top">
+              <div>
+                {getStatusBadge(healthStatus.status)}
+              </div>
             </Tooltip>
-          </div>
-          {showErrorModal && fullError !== cleanedError && (
-            <Tooltip title="View full error details" placement="top">
-              <button
-                onClick={() => showErrorModal(modelName, cleanedError, fullError)}
-                className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded cursor-pointer transition-colors"
-              >
-                <InformationCircleIcon className="h-4 w-4" />
-              </button>
-            </Tooltip>
+          ) : (
+            getStatusBadge(healthStatus.status)
           )}
         </div>
       );
