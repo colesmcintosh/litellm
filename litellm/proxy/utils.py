@@ -2508,8 +2508,9 @@ class PrismaClient:
                     health_check_data["details"] = clean_details
                 except Exception as detail_error:
                     verbose_proxy_logger.warning(f"Failed to clean details JSON: {detail_error}")
-                    # Don't include details field if it fails
-            # If details is None or not a dict, don't include the field at all
+                    health_check_data["details"] = {}
+            else:
+                health_check_data["details"] = {}
             
             # Add optional fields if they have valid values
             if checked_by is not None:

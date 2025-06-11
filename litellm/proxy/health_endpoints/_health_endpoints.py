@@ -323,6 +323,12 @@ async def _save_health_check_to_db(
         
 
         
+        # Add more debugging
+        verbose_proxy_logger.debug(f"Attempting to save health check for model: {model_name}")
+        verbose_proxy_logger.debug(f"Simplified details: {simplified_details}")
+        verbose_proxy_logger.debug(f"Error message: {error_message}")
+        verbose_proxy_logger.debug(f"Response time: {response_time_ms}")
+        
         await prisma_client.save_health_check_result(
             model_name=model_name,
             model_id=model_id,
@@ -331,9 +337,10 @@ async def _save_health_check_to_db(
             unhealthy_count=len(unhealthy_endpoints),
             error_message=error_message,
             response_time_ms=response_time_ms,
-            details=None,  # Skip details for now to avoid JSON serialization issues
+            details=simplified_details,
             checked_by=user_id,
         )
+        verbose_proxy_logger.debug("Successfully saved health check to database")
     except Exception as db_error:
         verbose_proxy_logger.warning(f"Failed to save health check to database for model {model_name}: {db_error}")
         # Continue execution - don't let database save failure break health checks
@@ -369,7 +376,6 @@ async def health_endpoint(
         health_check_details,
         health_check_results,
         llm_model_list,
-        llm_router,
         use_background_health_checks,
         user_model,
         prisma_client,
@@ -382,31 +388,13 @@ async def health_endpoint(
     target_model = model
     if model_id and not model:
         # Find the model name from model_id
-        # Use the same logic as /model/info endpoint but adapted for health check
-        if llm_router is not None:
-            # Get all models from router and find the one with matching model_id
-            try:
-                all_models = []
-                if llm_model_list is not None:
-                    all_models = copy.deepcopy(llm_model_list)
-                
-                for model_item in all_models:
-                    try:
-                        # Try to access model_info and model_name
-                        if hasattr(model_item, 'model_info') and hasattr(model_item, 'model_name'):
-                            model_info = model_item.model_info
-                            model_name = model_item.model_name
-                            
-                            # Check if model_info has the matching id
-                            if hasattr(model_info, 'id') and model_info.id == model_id:
-                                target_model = model_name
-                                break
-                        
-                    except Exception:
-                        continue
-                        
-            except Exception:
-                pass
+        if llm_model_list:
+            for model_item in llm_model_list:
+                if (hasattr(model_item, 'model_info') and 
+                    hasattr(model_item.model_info, 'id') and 
+                    model_item.model_info.id == model_id):
+                    target_model = model_item.model_name
+                    break
         
         if not target_model:
             raise HTTPException(
