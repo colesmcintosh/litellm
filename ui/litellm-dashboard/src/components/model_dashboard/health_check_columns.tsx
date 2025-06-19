@@ -2,7 +2,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button, Badge } from "@tremor/react";
 import { Tooltip, Checkbox } from "antd";
 import { Text } from "@tremor/react";
-import { InformationCircleIcon } from "@heroicons/react/outline";
+import { InformationCircleIcon, PlayIcon, RefreshIcon } from "@heroicons/react/outline";
 
 interface HealthCheckData {
   model_name: string;
@@ -26,18 +26,21 @@ interface HealthStatus {
   loading: boolean;
   error?: string;
   fullError?: string;
+  successResponse?: any;
 }
 
 export const healthCheckColumns = (
   modelHealthStatuses: {[key: string]: HealthStatus},
   selectedModelsForHealth: string[],
   allModelsSelected: boolean,
-  handleModelSelection: (modelName: string, checked: boolean) => void,
+  handleModelSelection: (modelId: string, checked: boolean) => void,
   handleSelectAll: (checked: boolean) => void,
   runIndividualHealthCheck: (modelName: string) => void,
   getStatusBadge: (status: string) => JSX.Element,
   getDisplayModelName: (model: any) => string,
   showErrorModal?: (modelName: string, cleanedError: string, fullError: string) => void,
+  showSuccessModal?: (modelName: string, response: any) => void,
+  setSelectedModelId?: (modelId: string) => void,
 ): ColumnDef<HealthCheckData>[] => [
   {
     header: () => (
@@ -46,6 +49,7 @@ export const healthCheckColumns = (
           checked={allModelsSelected}
           indeterminate={selectedModelsForHealth.length > 0 && !allModelsSelected}
           onChange={(e) => handleSelectAll(e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
         />
         <span>Model ID</span>
       </div>
@@ -55,18 +59,20 @@ export const healthCheckColumns = (
     sortingFn: "alphanumeric",
     cell: ({ row }) => {
       const model = row.original;
-      const modelName = model.model_name;
-      const isSelected = selectedModelsForHealth.includes(modelName);
+      const modelId = model.model_info.id;
+      const isSelected = selectedModelsForHealth.includes(modelId);
       
       return (
         <div className="flex items-center gap-2">
           <Checkbox
             checked={isSelected}
-            onChange={(e) => handleModelSelection(modelName, e.target.checked)}
+            onChange={(e) => handleModelSelection(modelId, e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
           />
           <Tooltip title={model.model_info.id}>
             <div 
               className="font-mono text-blue-500 bg-blue-50 hover:bg-blue-100 text-xs font-normal px-2 py-0.5 text-left w-full truncate whitespace-nowrap cursor-pointer max-w-[15ch]"
+              onClick={() => setSelectedModelId && setSelectedModelId(model.model_info.id)}
             >
               {model.model_info.id}
             </div>
@@ -131,9 +137,22 @@ export const healthCheckColumns = (
         );
       }
 
+      const modelName = model.model_name;
+      const hasSuccessResponse = healthStatus.status === 'healthy' && modelHealthStatuses[modelName]?.successResponse;
+
       return (
         <div className="flex items-center space-x-2">
           {getStatusBadge(healthStatus.status)}
+          {hasSuccessResponse && showSuccessModal && (
+            <Tooltip title="View response details" placement="top">
+              <button
+                onClick={() => showSuccessModal(modelName, modelHealthStatuses[modelName]?.successResponse)}
+                className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded cursor-pointer transition-colors"
+              >
+                <InformationCircleIcon className="h-4 w-4" />
+              </button>
+            </Tooltip>
+          )}
         </div>
       );
     },
