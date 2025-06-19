@@ -14,9 +14,11 @@ import { Table as TableInstance } from '@tanstack/react-table';
 interface HealthStatus {
   status: string;
   lastCheck: string;
+  lastSuccess?: string;
   loading: boolean;
   error?: string;
   fullError?: string;
+  successResponse?: any;
 }
 
 interface HealthCheckComponentProps {
@@ -24,6 +26,7 @@ interface HealthCheckComponentProps {
   modelData: any;
   all_models_on_proxy: string[];
   getDisplayModelName: (model: any) => string;
+  setSelectedModelId?: (modelId: string) => void;
 }
 
 const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
@@ -31,6 +34,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
   modelData,
   all_models_on_proxy,
   getDisplayModelName,
+  setSelectedModelId,
 }) => {
   const [modelHealthStatuses, setModelHealthStatuses] = useState<{[key: string]: HealthStatus}>({});
   const [selectedModelsForHealth, setSelectedModelsForHealth] = useState<string[]>([]);
@@ -40,6 +44,11 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
     modelName: string;
     cleanedError: string;
     fullError: string;
+  } | null>(null);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [selectedSuccessDetails, setSelectedSuccessDetails] = useState<{
+    modelName: string;
+    response: any;
   } | null>(null);
   
   const healthTableRef = useRef<TableInstance<any>>(null);
@@ -57,6 +66,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
         healthStatusMap[modelName] = {
           status: 'none',
           lastCheck: 'None',
+          lastSuccess: 'None',
           loading: false,
           error: undefined,
           fullError: undefined,
@@ -99,9 +109,11 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
               healthStatusMap[targetModelName] = {
                 status: checkData.status || 'unknown',
                 lastCheck: checkData.checked_at ? new Date(checkData.checked_at).toLocaleString() : 'None',
+                lastSuccess: checkData.status === 'healthy' ? (checkData.checked_at ? new Date(checkData.checked_at).toLocaleString() : 'None') : 'None',
                 loading: false,
                 error: fullError ? extractMeaningfulError(fullError) : undefined,
                 fullError: fullError,
+                successResponse: checkData.status === 'healthy' ? checkData : undefined,
               };
             }
           });
@@ -248,6 +260,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
           [modelName]: {
             status: 'unhealthy',
             lastCheck: currentTime,
+            lastSuccess: prev[modelName]?.lastSuccess || 'None',
             loading: false,
             error: errorMessage,
             fullError: rawError
@@ -259,7 +272,9 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
           [modelName]: {
             status: 'healthy',
             lastCheck: currentTime,
-            loading: false
+            lastSuccess: currentTime,
+            loading: false,
+            successResponse: response
           }
         }));
       }
@@ -281,9 +296,11 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
               [modelName]: {
                 status: checkData.status || prev[modelName]?.status || 'unknown',
                 lastCheck: checkData.checked_at ? new Date(checkData.checked_at).toLocaleString() : prev[modelName]?.lastCheck || 'None',
+                lastSuccess: checkData.status === 'healthy' ? (checkData.checked_at ? new Date(checkData.checked_at).toLocaleString() : prev[modelName]?.lastSuccess || 'None') : prev[modelName]?.lastSuccess || 'None',
                 loading: false,
                 error: fullError ? extractMeaningfulError(fullError) : prev[modelName]?.error,
                 fullError: fullError || prev[modelName]?.fullError,
+                successResponse: checkData.status === 'healthy' ? checkData : prev[modelName]?.successResponse,
               }
             }));
           }
@@ -311,7 +328,16 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
   };
 
   const runAllHealthChecks = async () => {
-    const modelsToCheck = selectedModelsForHealth.length > 0 ? selectedModelsForHealth : all_models_on_proxy;
+    // Convert selected model IDs to model names for health checks
+    let modelsToCheck: string[];
+    if (selectedModelsForHealth.length > 0) {
+      modelsToCheck = selectedModelsForHealth.map(modelId => {
+        const model = modelData.data.find((m: any) => m.model_info.id === modelId);
+        return model ? model.model_name : null;
+      }).filter(Boolean);
+    } else {
+      modelsToCheck = all_models_on_proxy;
+    }
     
     // Set all models to loading state
     const loadingStatuses = modelsToCheck.reduce((acc, modelName) => {
@@ -359,7 +385,8 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
             [modelName]: {
               status: 'healthy',
               lastCheck: currentTime,
-              loading: false
+              loading: false,
+              successResponse: response
             }
           }));
         }
@@ -408,6 +435,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
                   loading: false,
                   error: fullError ? extractMeaningfulError(fullError) : currentStatus?.error,
                   fullError: fullError || currentStatus?.fullError,
+                  successResponse: checkData.status === 'healthy' ? checkData : currentStatus?.successResponse,
                 }
               };
             });
@@ -420,11 +448,11 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
     }
   };
 
-  const handleModelSelection = (modelName: string, checked: boolean) => {
+  const handleModelSelection = (modelId: string, checked: boolean) => {
     if (checked) {
-      setSelectedModelsForHealth(prev => [...prev, modelName]);
+      setSelectedModelsForHealth(prev => [...prev, modelId]);
     } else {
-      setSelectedModelsForHealth(prev => prev.filter(name => name !== modelName));
+      setSelectedModelsForHealth(prev => prev.filter(id => id !== modelId));
       setAllModelsSelected(false);
     }
   };
@@ -432,7 +460,8 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
   const handleSelectAll = (checked: boolean) => {
     setAllModelsSelected(checked);
     if (checked) {
-      setSelectedModelsForHealth(all_models_on_proxy);
+      const allModelIds = modelData.data.map((model: any) => model.model_info.id);
+      setSelectedModelsForHealth(allModelIds);
     } else {
       setSelectedModelsForHealth([]);
     }
@@ -467,9 +496,22 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
     setSelectedErrorDetails(null);
   };
 
+  const showSuccessModal = (modelName: string, response: any) => {
+    setSelectedSuccessDetails({
+      modelName,
+      response
+    });
+    setSuccessModalVisible(true);
+  };
+
+  const closeSuccessModal = () => {
+    setSuccessModalVisible(false);
+    setSelectedSuccessDetails(null);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="border-b px-6 py-4">
+    <div>
+      <div className="mb-6">
         <div className="flex justify-between items-center">
           <div>
             <Title>Model Health Status</Title>
@@ -495,7 +537,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
               disabled={Object.values(modelHealthStatuses).some(status => status.loading)}
               className="px-3 py-1 text-sm"
             >
-              {selectedModelsForHealth.length > 0 && selectedModelsForHealth.length < all_models_on_proxy.length 
+              {selectedModelsForHealth.length > 0 && selectedModelsForHealth.length < modelData.data.length 
                 ? 'Run Selected Checks' 
                 : 'Run All Checks'}
             </Button>
@@ -503,7 +545,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
         </div>
       </div>
 
-      <div className="p-6">
+      <div>
         <ModelDataTable
           columns={healthCheckColumns(
             modelHealthStatuses,
@@ -515,6 +557,8 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
             getStatusBadge,
             getDisplayModelName,
             showErrorModal,
+            showSuccessModal,
+            setSelectedModelId,
           )}
           data={modelData.data.map((model: any) => {
             const modelName = model.model_name;
@@ -526,6 +570,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
               litellm_model_name: model.litellm_model_name,
               health_status: healthStatus.status,
               last_check: healthStatus.lastCheck,
+              last_success: healthStatus.lastSuccess || 'None',
               health_loading: healthStatus.loading,
               health_error: healthStatus.error,
               health_full_error: healthStatus.fullError,
@@ -562,6 +607,39 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
               <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md max-h-96 overflow-y-auto">
                 <pre className="text-sm text-gray-800 whitespace-pre-wrap">
                   {selectedErrorDetails.fullError}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        title={selectedSuccessDetails ? `Health Check Response - ${selectedSuccessDetails.modelName}` : 'Response Details'}
+        open={successModalVisible}
+        onCancel={closeSuccessModal}
+        footer={[
+          <AntdButton key="close" onClick={closeSuccessModal}>
+            Close
+          </AntdButton>
+        ]}
+        width={800}
+      >
+        {selectedSuccessDetails && (
+          <div className="space-y-4">
+            <div>
+              <Text className="font-medium">Status:</Text>
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                <Text className="text-green-800">Health check passed successfully</Text>
+              </div>
+            </div>
+            
+            <div>
+              <Text className="font-medium">Response Details:</Text>
+              <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md max-h-96 overflow-y-auto">
+                <pre className="text-sm text-gray-800 whitespace-pre-wrap">
+                  {JSON.stringify(selectedSuccessDetails.response, null, 2)}
                 </pre>
               </div>
             </div>
