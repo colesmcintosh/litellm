@@ -69,3 +69,80 @@ def test_initialize_loggers_with_handler_sets_propagate_false():
         assert (
             logger.propagate is False
         ), f"Logger {logger.name} has propagate set to {logger.propagate}, expected False"
+
+
+def test_cost_calculation_logging_respects_log_level(monkeypatch, caplog):
+    """
+    Test that cost calculation logs respect the LITELLM_LOG environment variable.
+    Verifies fix for issue #9815.
+    """
+    import litellm
+    from litellm import completion_cost
+    
+    # Test 1: With WARNING level, cost calculation logs should not appear
+    monkeypatch.setenv("LITELLM_LOG", "WARNING")
+    
+    # Re-import to pick up new env var
+    import importlib
+    importlib.reload(litellm._logging)
+    importlib.reload(litellm.cost_calculator)
+    
+    # Clear any existing logs
+    caplog.clear()
+    
+    # Create a mock completion response
+    mock_response = {
+        "id": "test",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "gpt-3.5-turbo",
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": "Test response"},
+            "finish_reason": "stop"
+        }],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30
+        }
+    }
+    
+    # Calculate cost - this should not produce INFO/DEBUG logs with WARNING level
+    with caplog.at_level(logging.WARNING):
+        try:
+            cost = completion_cost(
+                completion_response=mock_response,
+                model="gpt-3.5-turbo"
+            )
+        except Exception:
+            pass  # Cost calculation may fail, but we're only checking logs
+    
+    # Check that no "selected model name" logs appeared
+    log_messages = [record.message for record in caplog.records]
+    assert not any("selected model name for cost calculation" in msg for msg in log_messages), \
+        f"Cost calculation logs appeared with WARNING level: {log_messages}"
+    
+    # Test 2: With DEBUG level, cost calculation logs should appear
+    monkeypatch.setenv("LITELLM_LOG", "DEBUG")
+    
+    # Re-import to pick up new env var
+    importlib.reload(litellm._logging)
+    importlib.reload(litellm.cost_calculator)
+    
+    # Clear logs and test again
+    caplog.clear()
+    
+    with caplog.at_level(logging.DEBUG):
+        try:
+            cost = completion_cost(
+                completion_response=mock_response,
+                model="gpt-3.5-turbo"
+            )
+        except Exception:
+            pass  # Cost calculation may fail, but we're only checking logs
+    
+    # Check that "selected model name" logs DO appear with DEBUG level
+    log_messages = [record.message for record in caplog.records]
+    assert any("selected model name for cost calculation" in msg for msg in log_messages), \
+        f"Cost calculation logs did not appear with DEBUG level: {log_messages}"
