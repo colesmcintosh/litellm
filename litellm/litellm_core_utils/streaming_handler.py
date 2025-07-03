@@ -961,10 +961,13 @@ class CustomStreamWrapper:
                     ]
 
                 if anthropic_response_obj["usage"] is not None:
+                    # Extract usage data and ensure proper typing
+                    usage_data = anthropic_response_obj["usage"].copy()
+                    
                     setattr(
                         model_response,
                         "usage",
-                        litellm.Usage(**anthropic_response_obj["usage"]),
+                        litellm.Usage(**usage_data),
                     )
 
                 if (

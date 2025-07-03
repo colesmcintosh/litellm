@@ -438,9 +438,17 @@ class ChunkProcessor:
                 returned_usage.prompt_tokens_details = PromptTokensDetailsWrapper(
                     web_search_requests=web_search_requests
                 )
-            else:
+            elif isinstance(returned_usage.prompt_tokens_details, PromptTokensDetailsWrapper):
                 returned_usage.prompt_tokens_details.web_search_requests = (
                     web_search_requests
+                )
+            else:
+                # If it's a PromptTokensDetails (not wrapper), we need to create a new wrapper
+                # with the existing values plus web_search_requests
+                existing_data = returned_usage.prompt_tokens_details.model_dump()
+                returned_usage.prompt_tokens_details = PromptTokensDetailsWrapper(
+                    **existing_data,
+                    web_search_requests=web_search_requests
                 )
 
         # Return a new usage object with the new values
