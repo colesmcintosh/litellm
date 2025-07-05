@@ -235,7 +235,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
     return cleaned.length > 100 ? cleaned.substring(0, 97) + '...' : cleaned;
   };
 
-  const runIndividualHealthCheck = async (modelName: string) => {
+  const runIndividualHealthCheck = async (modelName: string, modelId?: string) => {
     if (!accessToken) return;
     
     setModelHealthStatuses(prev => ({
@@ -249,7 +249,7 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
 
     try {
       // Run the health check and process the response directly
-      const response = await individualModelHealthCheckCall(accessToken, modelName);
+      const response = await individualModelHealthCheckCall(accessToken, modelName, modelId);
       const currentTime = new Date().toLocaleString();
       
       // Check if there are any unhealthy endpoints (which means this specific model failed)
@@ -351,9 +351,13 @@ const HealthCheckComponent: React.FC<HealthCheckComponentProps> = ({
     const healthCheckPromises = modelsToCheck.map(async (modelName) => {
       if (!accessToken) return;
       
+      // Find the model_id for this model
+      const model = modelData.data.find((m: any) => m.model_name === modelName);
+      const modelId = model?.model_info?.id;
+      
       try {
         // Run the health check and store the result
-        const response = await individualModelHealthCheckCall(accessToken, modelName);
+        const response = await individualModelHealthCheckCall(accessToken, modelName, modelId);
         healthCheckResults[modelName] = response;
         
         // Update status immediately based on response

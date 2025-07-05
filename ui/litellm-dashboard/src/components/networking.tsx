@@ -4406,15 +4406,23 @@ export const healthCheckCall = async (accessToken: String) => {
 
 export const individualModelHealthCheckCall = async (
   accessToken: String,
-  modelName: string
+  modelName: string,
+  modelId?: string
 ) => {
   /**
-   * Run health check for a specific model using model name
+   * Run health check for a specific model using model name or model id
    */
   try {
     let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/health?model=${encodeURIComponent(modelName)}`
-      : `/health?model=${encodeURIComponent(modelName)}`;
+      ? `${proxyBaseUrl}/health`
+      : `/health`;
+    
+    // Prefer model_id if available as it's unique
+    if (modelId) {
+      url += `?model_id=${encodeURIComponent(modelId)}`;
+    } else {
+      url += `?model=${encodeURIComponent(modelName)}`;
+    }
 
     const response = await fetch(url, {
       method: "GET",

@@ -37,7 +37,7 @@ export const healthCheckColumns = (
   allModelsSelected: boolean,
   handleModelSelection: (modelName: string, checked: boolean) => void,
   handleSelectAll: (checked: boolean) => void,
-  runIndividualHealthCheck: (modelName: string) => void,
+  runIndividualHealthCheck: (modelName: string, modelId?: string) => void,
   getStatusBadge: (status: string) => JSX.Element,
   getDisplayModelName: (model: any) => string,
   showErrorModal?: (modelName: string, cleanedError: string, fullError: string) => void,
@@ -301,7 +301,7 @@ export const healthCheckColumns = (
             }`}
             onClick={() => {
               if (!model.health_loading) {
-                runIndividualHealthCheck(modelName);
+                runIndividualHealthCheck(modelName, model.model_info?.id);
               }
             }}
             disabled={model.health_loading}
