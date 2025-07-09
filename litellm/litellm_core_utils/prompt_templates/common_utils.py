@@ -520,11 +520,13 @@ def unpack_defs(schema: dict, defs: dict) -> None:
 
     # Use iterative approach with queue to avoid recursion
     # Each item in queue is (node, parent_container, key/index, active_defs, seen_ids)
-    queue: deque[tuple[Any, Union[dict, list, None], Union[str, int, None], dict, set]] = deque([(schema, None, None, root_defs, set())])
-    
+    queue: deque[
+        tuple[Any, Union[dict, list, None], Union[str, int, None], dict, set]
+    ] = deque([(schema, None, None, root_defs, set())])
+
     while queue:
         node, parent, key, active_defs, seen = queue.popleft()
-        
+
         # Avoid infinite loops on self-referential schemas
         if id(node) in seen:
             continue
@@ -560,7 +562,7 @@ def unpack_defs(schema: dict, defs: dict) -> None:
                     schema.clear()
                     schema.update(resolved)
                     resolved = schema
-                
+
                 # Add resolved node to queue for further processing
                 queue.append((resolved, parent, key, child_defs, seen))
                 continue
@@ -624,6 +626,7 @@ def _get_image_mime_type_from_url(url: str) -> Optional[str]:
         (".wmv",): "video/wmv",
         (".mpegps",): "video/mpegps",
         (".flv",): "video/flv",
+        (".webm",): "video/webm",
         # Audio
         (".mp3",): "audio/mp3",
         (".wav",): "audio/wav",

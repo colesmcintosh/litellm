@@ -100,7 +100,12 @@ class GoogleAIStudioGeminiConfig(VertexGeminiConfig):
     ) -> List[ContentType]:
         """
         Google AI Studio Gemini does not support image urls in messages.
+        Videos should not be converted to base64, they should be passed as URLs.
         """
+        from litellm.litellm_core_utils.prompt_templates.common_utils import (
+            _get_image_mime_type_from_url,
+        )
+
         for message in messages:
             _message_content = message.get("content")
             if _message_content is not None and isinstance(_message_content, list):
@@ -115,13 +120,25 @@ class GoogleAIStudioGeminiConfig(VertexGeminiConfig):
                             format = img_element["image_url"].get("format")  # type: ignore
                         else:
                             _image_url = img_element.get("image_url")  # type: ignore
+
                         if _image_url and "https://" in _image_url:
-                            image_obj = convert_to_anthropic_image_obj(
-                                _image_url, format=format
+                            # Check if this is a video URL
+                            mime_type = format or _get_image_mime_type_from_url(
+                                _image_url
                             )
-                            img_element["image_url"] = (  # type: ignore
-                                convert_generic_image_chunk_to_openai_image_obj(
-                                    image_obj
+
+                            # Only convert to base64 if it's an image, not a video
+                            if mime_type and mime_type.startswith("video/"):
+                                # Keep video URLs as-is, don't convert to base64
+                                pass
+                            else:
+                                # Convert images to base64
+                                image_obj = convert_to_anthropic_image_obj(
+                                    _image_url, format=format
                                 )
-                            )
+                                img_element["image_url"] = (  # type: ignore
+                                    convert_generic_image_chunk_to_openai_image_obj(
+                                        image_obj
+                                    )
+                                )
         return _gemini_convert_messages_with_history(messages=messages)

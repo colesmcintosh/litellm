@@ -35,8 +35,16 @@ def _process_image_response(response: Response, url: str) -> str:
             "webp": "image/webp",
         }.get(img_type)
         if _img_type is None:
+            # Check if it's a video format
+            video_formats = ["mp4", "mov", "avi", "mpeg", "mpg", "wmv", "flv", "webm"]
+            if img_type in video_formats:
+                raise Exception(
+                    f"Error: Cannot convert video to base64. Video format '{img_type}' detected. "
+                    f"Videos should be passed as URLs, not converted to base64. "
+                    f"Please ensure your model supports video URLs directly."
+                )
             raise Exception(
-                f"Error: Unsupported image format. Format={_img_type}. Supported types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']"
+                f"Error: Unsupported image format. Format={img_type}. Supported types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']"
             )
         img_type = _img_type
     else:
