@@ -1,10 +1,21 @@
 model_list:
-  - model_name: azure_ai/*
+  - model_name: anthropic/*
     litellm_params:
-      model: azure_ai/*
+      model: anthropic/*
+  - model_name: openai/*
+    litellm_params:
+      model: openai/*
 
+general_settings:
+  custom_ui_sso_sign_in_handler: "custom_hooks.custom_ui_sso_hook.custom_ui_sso_sign_in_handler"
 
-mcp_servers:
-  deepwiki_mcp:
-    url: "https://mcp.deepwiki.com/mcp"
-    transport: "http"
+guardrails:
+  - guardrail_name: "bedrock-pre-guard"
+    litellm_params:
+      guardrail: bedrock  # supported values: "aporia", "bedrock", "lakera"
+      mode: "during_call"
+      guardrailIdentifier: ff6ujrregl1q
+      guardrailVersion: "DRAFT"
+
+litellm_settings:
+  callbacks: ["datadog_llm_observability"]
