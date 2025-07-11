@@ -4837,6 +4837,38 @@ export const fetchMCPServers = async (accessToken: string) => {
   }
 };
 
+export const fetchMCPAccessGroups = async (accessToken: string) => {
+  try {
+    // Construct base URL
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/v1/mcp/access_groups`
+      : `/v1/mcp/access_groups`;
+
+    console.log("Fetching MCP access groups from:", url);
+
+    const response = await fetch(url, {
+      method: HTTP_REQUEST.GET,
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Network response was not ok");
+    }
+
+    const data = await response.json();
+    console.log("Fetched MCP access groups:", data);
+    return data.access_groups || [];
+  } catch (error) {
+    console.error("Failed to fetch MCP access groups:", error);
+    throw error;
+  }
+};
+
 export const createMCPServer = async (
   accessToken: string,
   formValues: Record<string, any> // Assuming formValues is an object
@@ -5998,4 +6030,123 @@ export const mcpToolsCall = async (accessToken: string) => {
   }
 
   return await response.json();
+};
+
+export const testMCPConnectionRequest = async (
+  accessToken: string,
+  mcpServerConfig: Record<string, any>
+) => {
+  try {
+    console.log(
+      "Testing MCP connection with config:",
+      JSON.stringify(mcpServerConfig)
+    );
+
+    // Construct the URL for POST request
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/mcp-rest/test/connection`
+      : `/mcp-rest/test/connection`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(mcpServerConfig),
+    });
+
+    // Check for non-JSON responses first
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Received non-JSON response:", text);
+      throw new Error(
+        `Received non-JSON response (${response.status}: ${response.statusText}). Check network tab for details.`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!response.ok || data.status === "error") {
+      // Return the error response instead of throwing an error
+      // This allows the caller to handle the error format properly
+      if (data.status === "error") {
+        return data; // Return the full error response
+      } else {
+        return {
+          status: "error",
+          message:
+            data.error?.message ||
+            `MCP connection test failed: ${response.status} ${response.statusText}`,
+        };
+      }
+    }
+
+    return data;
+  } catch (error) {
+    console.error("MCP connection test error:", error);
+    // For network errors or other exceptions, still throw
+    throw error;
+  }
+};
+
+export const testMCPToolsListRequest = async (
+  accessToken: string,
+  mcpServerConfig: Record<string, any>
+) => {
+  try {
+    console.log(
+      "Testing MCP tools list with config:",
+      JSON.stringify(mcpServerConfig)
+    );
+
+    // Construct the URL for POST request
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/mcp-rest/test/tools/list`
+      : `/mcp-rest/test/tools/list`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(mcpServerConfig),
+    });
+
+    // Check for non-JSON responses first
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Received non-JSON response:", text);
+      throw new Error(
+        `Received non-JSON response (${response.status}: ${response.statusText}). Check network tab for details.`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      // Return the error response instead of throwing an error
+      // This allows the caller to handle the error format properly
+      if (data.error) {
+        return data; // Return the full error response
+      } else {
+        return {
+          tools: [],
+          error: "request_failed",
+          message:
+            data.message ||
+            `MCP tools list failed: ${response.status} ${response.statusText}`,
+        };
+      }
+    }
+
+    return data;
+  } catch (error) {
+    console.error("MCP tools list test error:", error);
+    // For network errors or other exceptions, still throw
+    throw error;
+  }
 };
