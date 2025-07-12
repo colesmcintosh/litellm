@@ -35,6 +35,38 @@ class TestMCPServerManager:
         result = _deserialize_env_dict(invalid_json)
         assert result is None
 
+    def test_add_update_server_missing_env_attribute(self):
+        """Test adding server when Prisma model doesn't include env attribute"""
+        manager = MCPServerManager()
+        
+        # Create a mock server object that simulates Prisma not including the env field
+        class MockPrismaMCPServer:
+            def __init__(self):
+                self.server_id = "test-server-no-env"
+                self.alias = "test_server_no_env"
+                self.description = "Test server without env attribute"
+                self.url = None
+                self.transport = MCPTransport.stdio
+                self.spec_version = MCPSpecVersion.mar_2025
+                self.auth_type = None
+                self.command = "python"
+                self.args = ["-m", "server"]
+                self.created_at = datetime.now()
+                self.updated_at = datetime.now()
+                self.mcp_info = {}
+                self.mcp_access_groups = []
+                # Note: No env attribute to simulate Prisma behavior
+        
+        mock_server = MockPrismaMCPServer()
+        
+        # This should not raise AttributeError
+        manager.add_update_server(mock_server)
+        
+        # Verify server was added with None env
+        assert "test-server-no-env" in manager.registry
+        added_server = manager.registry["test-server-no-env"]
+        assert added_server.env is None
+
     def test_add_update_server_stdio(self):
         """Test adding stdio MCP server"""
         manager = MCPServerManager()
