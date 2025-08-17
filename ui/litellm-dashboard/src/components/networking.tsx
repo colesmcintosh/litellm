@@ -166,7 +166,8 @@ const handleError = async (errorData: string) => {
   const currentTime = Date.now();
   if (currentTime - lastErrorTime > 60000) {
     // 60000 milliseconds = 60 seconds
-    if (errorData.includes("Authentication Error - Expired Key")) {
+    const errorString = typeof errorData === 'string' ? errorData : String(errorData);
+    if (errorString.includes("Authentication Error - Expired Key")) {
       message.info("UI Session Expired. Logging out.");
       lastErrorTime = currentTime;
       document.cookie =
@@ -2405,11 +2406,26 @@ export const keySpendLogsCall = async (accessToken: String, token: String) => {
   }
 };
 
-export const teamSpendLogsCall = async (accessToken: String) => {
+export const teamSpendLogsCall = async (
+  accessToken: String,
+  startTime: String | undefined,
+  endTime: String | undefined,
+  limit: number = 100
+) => {
   try {
-    const url = proxyBaseUrl
+    let url = proxyBaseUrl
       ? `${proxyBaseUrl}/global/spend/teams`
       : `/global/spend/teams`;
+    
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    
+    if (startTime && endTime) {
+      params.append('start_date', startTime.split('T')[0]); // Convert to YYYY-MM-DD format
+      params.append('end_date', endTime.split('T')[0]);
+    }
+    
+    url += `?${params.toString()}`;
     console.log("in teamSpendLogsCall:", url);
     const response = await fetch(`${url}`, {
       method: "GET",
@@ -2439,20 +2455,28 @@ export const tagsSpendLogsCall = async (
   accessToken: String,
   startTime: String | undefined,
   endTime: String | undefined,
-  tags: String[] | undefined
+  tags: String[] | undefined,
+  limit: number = 100
 ) => {
   try {
     let url = proxyBaseUrl
       ? `${proxyBaseUrl}/global/spend/tags`
       : `/global/spend/tags`;
-
+    
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    
     if (startTime && endTime) {
-      url = `${url}?start_date=${startTime}&end_date=${endTime}`;
+      params.append('start_date', startTime);
+      params.append('end_date', endTime);
     }
+    
+    url = `${url}?${params.toString()}`;
 
     // if tags, convert the list to a comma separated string
     if (tags) {
-      url += `${url}&tags=${tags.join(",")}`;
+      params.append('tags', tags.join(","));
+      url = `${url.split('?')[0]}?${params.toString()}`;
     }
 
     console.log("in tagsSpendLogsCall:", url);
@@ -2683,11 +2707,11 @@ export const uiSpendLogsCall = async (
   }
 };
 
-export const adminSpendLogsCall = async (accessToken: String) => {
+export const adminSpendLogsCall = async (accessToken: String, limit: number = 100) => {
   try {
     let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/global/spend/logs`
-      : `/global/spend/logs`;
+      ? `${proxyBaseUrl}/global/spend/logs?limit=${limit}`
+      : `/global/spend/logs?limit=${limit}`;
 
     //message.info("Making spend logs request");
     const response = await fetch(url, {
@@ -2715,11 +2739,11 @@ export const adminSpendLogsCall = async (accessToken: String) => {
   }
 };
 
-export const adminTopKeysCall = async (accessToken: String) => {
+export const adminTopKeysCall = async (accessToken: String, limit: number = 5) => {
   try {
     let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/global/spend/keys?limit=5`
-      : `/global/spend/keys?limit=5`;
+      ? `${proxyBaseUrl}/global/spend/keys?limit=${limit}`
+      : `/global/spend/keys?limit=${limit}`;
 
     //message.info("Making spend keys request");
     const response = await fetch(url, {
@@ -3050,11 +3074,11 @@ export const adminGlobalActivityExceptionsPerDeployment = async (
   }
 };
 
-export const adminTopModelsCall = async (accessToken: String) => {
+export const adminTopModelsCall = async (accessToken: String, limit: number = 5) => {
   try {
     let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/global/spend/models?limit=5`
-      : `/global/spend/models?limit=5`;
+      ? `${proxyBaseUrl}/global/spend/models?limit=${limit}`
+      : `/global/spend/models?limit=${limit}`;
 
     //message.info("Making top models request");
     const response = await fetch(url, {
@@ -7516,10 +7540,866 @@ export const perUserAnalyticsCall = async (
   }
 };
 
+// New aggregated endpoints for faster dashboard loading
+export const fetchDashboardSummary = async (accessToken: String, days: number = 30) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/spend/dashboard-summary?days=${days}`
+      : `/global/spend/dashboard-summary?days=${days}`;
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error(errorData);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching dashboard summary:", error);
+    throw error;
+  }
+};
+
+export const fetchActivitySummary = async (accessToken: String, days: number = 30) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/spend/activity-summary?days=${days}`
+      : `/global/spend/activity-summary?days=${days}`;
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error(errorData);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching activity summary:", error);
+    throw error;
+  }
+};
+
+export const fetchTeamsSummary = async (accessToken: String, days: number = 30, limit: number = 10) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/spend/teams-summary?days=${days}&limit=${limit}`
+      : `/global/spend/teams-summary?days=${days}&limit=${limit}`;
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error(errorData);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching teams summary:", error);
+    throw error;
+  }
+};
+
 const deriveErrorMessage = (errorData: any): string => {
-  return (errorData?.error && (errorData.error.message || errorData.error)) ||
+  // Try to extract meaningful error messages in order of preference
+  const extractedMessage = (errorData?.error && (errorData.error.message || errorData.error)) ||
     errorData?.message ||
     errorData?.detail ||
-    errorData?.error ||
-    JSON.stringify(errorData);
+    errorData?.error;
+  
+  if (extractedMessage && typeof extractedMessage === 'string') {
+    return extractedMessage;
+  }
+  
+  // Fallback to safe stringification
+  try {
+    return JSON.stringify(errorData);
+  } catch (e) {
+    // If JSON.stringify fails (circular reference, etc.), return a generic message
+    return `Request failed with status: ${errorData?.status || 'unknown'}`;
+  }
+};
+
+// Individual metric endpoints for parallel loading
+export const fetchTotalRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/metrics/total-requests`
+      : `/global/metrics/total-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch total requests:", error);
+    throw error;
+  }
+};
+
+export const fetchSuccessfulRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/metrics/successful-requests`
+      : `/global/metrics/successful-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch successful requests:", error);
+    throw error;
+  }
+};
+
+export const fetchFailedRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/metrics/failed-requests`
+      : `/global/metrics/failed-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch failed requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTotalTokens = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/metrics/total-tokens`
+      : `/global/metrics/total-tokens`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch total tokens:", error);
+    throw error;
+  }
+};
+
+export const fetchTotalSpend = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/metrics/total-spend`
+      : `/global/metrics/total-spend`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch total spend:", error);
+    throw error;
+  }
+};
+
+export const fetchAverageCostPerRequest = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/global/metrics/average-cost-per-request`
+      : `/global/metrics/average-cost-per-request`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch average cost per request:", error);
+    throw error;
+  }
+};
+
+// Team-specific metric endpoints
+export const fetchTeamTotalRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/teams/metrics/total-requests`
+      : `/teams/metrics/total-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch team total requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTeamSuccessfulRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/teams/metrics/successful-requests`
+      : `/teams/metrics/successful-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch team successful requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTeamFailedRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/teams/metrics/failed-requests`
+      : `/teams/metrics/failed-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch team failed requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTeamTotalTokens = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/teams/metrics/total-tokens`
+      : `/teams/metrics/total-tokens`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch team total tokens:", error);
+    throw error;
+  }
+};
+
+export const fetchTeamTotalSpend = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/teams/metrics/total-spend`
+      : `/teams/metrics/total-spend`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch team total spend:", error);
+    throw error;
+  }
+};
+
+export const fetchTeamAverageCostPerRequest = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/teams/metrics/average-cost-per-request`
+      : `/teams/metrics/average-cost-per-request`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch team average cost per request:", error);
+    throw error;
+  }
+};
+
+// Tag-specific metric endpoints
+export const fetchTagTotalRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/tags/metrics/total-requests`
+      : `/tags/metrics/total-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch tag total requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTagSuccessfulRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/tags/metrics/successful-requests`
+      : `/tags/metrics/successful-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch tag successful requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTagFailedRequests = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/tags/metrics/failed-requests`
+      : `/tags/metrics/failed-requests`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch tag failed requests:", error);
+    throw error;
+  }
+};
+
+export const fetchTagTotalTokens = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/tags/metrics/total-tokens`
+      : `/tags/metrics/total-tokens`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch tag total tokens:", error);
+    throw error;
+  }
+};
+
+export const fetchTagTotalSpend = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/tags/metrics/total-spend`
+      : `/tags/metrics/total-spend`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch tag total spend:", error);
+    throw error;
+  }
+};
+
+export const fetchTagAverageCostPerRequest = async (
+  accessToken: string,
+  startDate?: string,
+  endDate?: string
+) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/tags/metrics/average-cost-per-request`
+      : `/tags/metrics/average-cost-per-request`;
+    
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.append('start_date', startDate.split('T')[0]);
+      params.append('end_date', endDate.split('T')[0]);
+    }
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch tag average cost per request:", error);
+    throw error;
+  }
 };

@@ -118,7 +118,7 @@ def update_breakdown_metrics(
             record,
         )
 
-    if record.mcp_namespaced_tool_name:
+    if hasattr(record, 'mcp_namespaced_tool_name') and record.mcp_namespaced_tool_name:
         if record.mcp_namespaced_tool_name not in breakdown.mcp_servers:
             breakdown.mcp_servers[record.mcp_namespaced_tool_name] = MetricWithMetadata(
                 metrics=SpendMetrics(),

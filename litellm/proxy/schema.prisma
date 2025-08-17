@@ -393,6 +393,9 @@ model LiteLLM_DailyUserSpend {
   @@index([api_key])
   @@index([model])
   @@index([mcp_namespaced_tool_name])
+  @@index([date, user_id]) // Composite index for date range queries by user
+  @@index([date, spend]) // Composite index for date + spend ordering
+  @@index([date, api_requests]) // Composite index for date + requests ordering
 }
 
 // Track daily team spend metrics per model and key
@@ -422,6 +425,9 @@ model LiteLLM_DailyTeamSpend {
   @@index([api_key])
   @@index([model])
   @@index([mcp_namespaced_tool_name])
+  @@index([date, team_id]) // Composite index for date range queries by team
+  @@index([date, spend]) // Composite index for date + spend ordering
+  @@index([team_id, spend]) // Composite index for team spend ranking
 }
 
 // Track daily team spend metrics per model and key
@@ -451,6 +457,9 @@ model LiteLLM_DailyTagSpend {
   @@index([api_key])
   @@index([model])
   @@index([mcp_namespaced_tool_name])
+  @@index([date, tag]) // Composite index for date range queries by tag
+  @@index([date, spend]) // Composite index for date + spend ordering
+  @@index([tag, spend]) // Composite index for tag spend ranking
 }
 
 
